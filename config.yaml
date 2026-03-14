@@ -1,0 +1,23 @@
+digest:
+  # Title shown in the email subject and header
+  title: "My Daily Digest"
+
+# Add, remove, or edit topics below.
+# Each topic will become its own section in the digest email.
+# - name:        used as the section header
+# - description: guides Claude's research focus for that topic
+topics:
+  - name: "AI & LLMs"
+    description: >
+      Latest developments in large language models, AI safety research,
+      new model releases, and applied AI products and startups.
+
+  - name: "Tech & Startups"
+    description: >
+      Notable startup funding rounds, product launches, acquisitions,
+      and trends in the broader technology industry.
+
+  - name: "Personal Finance & Markets"
+    description: >
+      Key market movements, macroeconomic news, personal finance tips,
+      and investing insights relevant to individual investors.
