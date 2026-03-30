@@ -8,10 +8,7 @@ then sends a formatted HTML digest email via Gmail SMTP.
 import datetime
 import json
 import os
-import smtplib
 import sys
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 import anthropic
 import markdown
@@ -20,16 +17,13 @@ import yaml
 from dotenv import load_dotenv
 
 # ── Load environment variables ─────────────────────────────────────────────────
-# load_dotenv() is a no-op when .env is absent (e.g. in GitHub Actions),
-# so the same script works both locally and in CI without branching.
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
-BRAVE_API_KEY = os.environ["BRAVE_API_KEY"]
-GMAIL_USER = os.environ["GMAIL_USER"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
-RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "")
-DEBUG_MODE = os.environ.get("DEBUG_MODE", "false").lower() == "true"
+ANTHROPIC_API_KEY  = os.environ["ANTHROPIC_API_KEY"]
+BRAVE_API_KEY      = os.environ["BRAVE_API_KEY"]
+APPS_SCRIPT_URL    = os.environ["APPS_SCRIPT_URL"]
+APPS_SCRIPT_SECRET = os.environ["APPS_SCRIPT_SECRET"]
+DEBUG_MODE         = os.environ.get("DEBUG_MODE", "false").lower() == "true"
 
 # ── Load config ────────────────────────────────────────────────────────────────
 with open("config.yaml") as f:
@@ -37,12 +31,6 @@ with open("config.yaml") as f:
 
 digest_title = config["digest"]["title"]
 topics = config["topics"]
-recipient = RECIPIENT_EMAIL or config["digest"].get("recipient_email", "")
-
-if not recipient and not DEBUG_MODE:
-    print("ERROR: No recipient email set. Set RECIPIENT_EMAIL env var or add "
-          "recipient_email under digest: in config.yaml.", file=sys.stderr)
-    sys.exit(1)
 
 # ── Brave Search ───────────────────────────────────────────────────────────────
 def brave_web_search(query: str, count: int = 8) -> list[dict]:
@@ -231,17 +219,17 @@ def build_email_html(title: str, date_str: str, topic_sections: list[str]) -> st
 </html>"""
 
 
-# ── Gmail SMTP sending ─────────────────────────────────────────────────────────
-def send_email(subject: str, html_body: str, to: str) -> None:
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = GMAIL_USER
-    msg["To"] = to
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, to, msg.as_string())
+# ── Apps Script email sending ──────────────────────────────────────────────────
+def send_email(subject: str, html_body: str) -> None:
+    response = requests.post(
+        APPS_SCRIPT_URL,
+        json={"token": APPS_SCRIPT_SECRET, "subject": subject, "html_body": html_body},
+        timeout=30,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if result.get("status") != "sent":
+        raise RuntimeError(f"Apps Script error: {result}")
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -267,8 +255,8 @@ def main() -> None:
         print(html)
         print("--- END DEBUG ---")
     else:
-        print(f"\nSending digest to {recipient} ...", end=" ", flush=True)
-        send_email(subject, html, recipient)
+        print("\nSending digest via Apps Script ...", end=" ", flush=True)
+        send_email(subject, html)
         print("sent!")
 
 
